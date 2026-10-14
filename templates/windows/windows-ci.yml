@@ -1,0 +1,75 @@
+name: "Windows Desktop & CI/CD"
+
+on:
+  push:
+    branches: [ "main", "master" ]
+    tags: [ "v*" ]
+  pull_request:
+    branches: [ "main", "master" ]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-windows:
+    name: "Build & Test Windows"
+    runs-on: windows-2022
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup .NET SDK (si projet .NET présent)
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.0.x"
+
+      - name: Setup Python (si scripts / PyInstaller)
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Build & Test .NET Solution
+        shell: pwsh
+        run: |
+          if (Get-ChildItem -Filter *.sln, *.csproj -Recurse) {
+            Write-Host "Projet .NET détecté. Restauration et compilation..."
+            dotnet restore
+            dotnet test --no-restore --verbosity normal
+            dotnet publish -c Release -o ./publish
+          } else {
+            Write-Host "Aucun projet .NET trouvé."
+          }
+
+      - name: Build Python Executable (PyInstaller)
+        shell: pwsh
+        run: |
+          if (Test-Path "setup.py" -Or Test-Path "main.py") {
+            Write-Host "Projet Python détecté..."
+            pip install --upgrade pip
+            if (Test-Path "requirements.txt") { pip install -r requirements.txt }
+            pip install pyinstaller
+            if (Test-Path "main.py") {
+              pyinstaller --onefile --noconsole --distpath ./publish main.py
+            }
+          }
+
+      - name: Upload Windows Binaries Artifact
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-binaries
+          path: ./publish/*
+          retention-days: 14
+
+      - name: Attach Windows Binaries to Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if (Test-Path "./publish") {
+            gh release upload "${{ github.ref_name }}" (Get-ChildItem ./publish/* -Include *.exe,*.zip).FullName --clobber
+          }

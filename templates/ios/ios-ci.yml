@@ -1,0 +1,68 @@
+name: "iOS & macOS CI/CD"
+
+on:
+  push:
+    branches: [ "main", "master" ]
+    tags: [ "v*" ]
+  pull_request:
+    branches: [ "main", "master" ]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-ios:
+    name: "Build & Test iOS"
+    runs-on: macos-14
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Select Xcode Version
+        run: |
+          sudo xcode-select -s /Applications/Xcode_15.4.app/Contents/Developer || sudo xcode-select -r
+          xcodebuild -version
+
+      - name: Resolve Swift Package Dependencies
+        run: |
+          if [ -f "Package.swift" ]; then
+            swift package resolve
+          fi
+
+      - name: Run Tests (Simulator)
+        run: |
+          # Si un workspace Xcode existe
+          if ls *.xcworkspace 1> /dev/null 2>&1; then
+            WORKSPACE=$(ls -d *.xcworkspace | head -n 1)
+            SCHEME=$(xcodebuild -list -workspace "$WORKSPACE" -json | jq -r '.workspace.schemes[0]')
+            xcodebuild test -workspace "$WORKSPACE" -scheme "$SCHEME" -destination 'platform=iOS Simulator,name=iPhone 15,OS=latest' CODE_SIGNING_ALLOWED=NO
+          elif ls *.xcodeproj 1> /dev/null 2>&1; then
+            PROJECT=$(ls -d *.xcodeproj | head -n 1)
+            SCHEME=$(xcodebuild -list -project "$PROJECT" -json | jq -r '.project.schemes[0]')
+            xcodebuild test -project "$PROJECT" -scheme "$SCHEME" -destination 'platform=iOS Simulator,name=iPhone 15,OS=latest' CODE_SIGNING_ALLOWED=NO
+          else
+            echo "Aucun projet Xcode détecté, étape de test ignorée."
+          fi
+
+      - name: Build Archive (No code signing / CI validation)
+        run: |
+          if ls *.xcworkspace 1> /dev/null 2>&1; then
+            WORKSPACE=$(ls -d *.xcworkspace | head -n 1)
+            SCHEME=$(xcodebuild -list -workspace "$WORKSPACE" -json | jq -r '.workspace.schemes[0]')
+            xcodebuild archive -workspace "$WORKSPACE" -scheme "$SCHEME" -archivePath build/App.xcarchive CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO
+          elif ls *.xcodeproj 1> /dev/null 2>&1; then
+            PROJECT=$(ls -d *.xcodeproj | head -n 1)
+            SCHEME=$(xcodebuild -list -project "$PROJECT" -json | jq -r '.project.schemes[0]')
+            xcodebuild archive -project "$PROJECT" -scheme "$SCHEME" -archivePath build/App.xcarchive CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO
+          fi
+
+      - name: Upload Archive Artifact
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-archive
+          path: build/App.xcarchive
+          retention-days: 7
