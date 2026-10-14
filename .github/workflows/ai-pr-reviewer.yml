@@ -10,8 +10,8 @@ permissions:
 
 jobs:
   review:
-    # Ne pas exécuter sur les PRs automatisées de Dependabot pour économiser les quotas
-    if: github.actor != 'dependabot[bot]'
+    # S'exécute uniquement sur les branches internes du dépôt (exclut les forks externes et Dependabot pour préserver les quotas)
+    if: github.actor != 'dependabot[bot]' && github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-24.04
     steps:
       - name: Checkout Repository
