@@ -1,0 +1,72 @@
+name: "Cloudflare Pages Deployment (Zero-Server)"
+
+on:
+  push:
+    branches: [ "main", "master" ]
+  pull_request:
+    branches: [ "main", "master" ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  deployments: write
+  pull-requests: write
+
+jobs:
+  deploy:
+    name: "Build & Deploy to Cloudflare Pages"
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js LTS
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+
+      - name: Install Dependencies
+        run: |
+          if [ -f package-lock.json ]; then
+            npm ci
+          else
+            npm install
+          fi
+
+      - name: Lint & Typecheck
+        run: |
+          npm run lint --if-present
+          npm run typecheck --if-present
+
+      - name: Run Unit Tests
+        run: |
+          npm test --if-present -- --passWithNoTests
+
+      - name: Build Application Bundle
+        run: |
+          npm run build
+
+      - name: Detect Output Directory
+        id: output-dir
+        run: |
+          if [ -d "dist" ]; then
+            echo "dir=dist" >> $GITHUB_OUTPUT
+          elif [ -d "build" ]; then
+            echo "dir=build" >> $GITHUB_OUTPUT
+          elif [ -d "out" ]; then
+            echo "dir=out" >> $GITHUB_OUTPUT
+          else
+            echo "dir=." >> $GITHUB_OUTPUT
+          fi
+
+      - name: Deploy to Cloudflare Pages
+        uses: cloudflare/pages-action@v1
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          projectName: ${{ github.event.repository.name }}
+          directory: ${{ steps.output-dir.outputs.dir }}
+          gitHubToken: ${{ secrets.GITHUB_TOKEN }}

@@ -46,6 +46,7 @@ cicd/
     ├── windows/windows-ci.yml
     ├── python/python-ci.yml
     ├── web/web-ci.yml
+    ├── web/cloudflare-pages.yml  # Déploiement Cloudflare Pages serverless
     └── security/dependabot.yml
 ```
 
