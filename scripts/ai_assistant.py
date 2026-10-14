@@ -12,13 +12,25 @@ import argparse
 import urllib.request
 import urllib.error
 
+# Forcer l'encodage UTF-8 pour stdout et stderr sur tous les systèmes (notamment Windows)
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8")
+if hasattr(sys.stderr, "reconfigure"):
+    sys.stderr.reconfigure(encoding="utf-8")
+
 API_URL_TEMPLATE = "https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={key}"
-DEFAULT_MODEL = "gemini-2.5-flash"
-FALLBACK_MODEL = "gemini-1.5-flash"
+DEFAULT_MODEL = "gemini-3.6-flash"
+CANDIDATE_MODELS = [
+    "gemini-3.6-flash",
+    "gemini-flash-lite-latest",
+    "gemini-3.1-flash-lite",
+    "gemini-3.8-flash",
+    "gemini-flash-latest",
+]
 
 
 def call_gemini(api_key: str, prompt: str, system_instruction: str = None, model: str = DEFAULT_MODEL) -> str:
-    """Appelle l'API Gemini REST de manière autonome."""
+    """Appelle l'API Gemini REST de manière autonome et résiliente."""
     headers = {"Content-Type": "application/json"}
     
     payload = {
@@ -39,8 +51,9 @@ def call_gemini(api_key: str, prompt: str, system_instruction: str = None, model
         }
         
     models_to_try = [model]
-    if model != FALLBACK_MODEL:
-        models_to_try.append(FALLBACK_MODEL)
+    for m in CANDIDATE_MODELS:
+        if m not in models_to_try:
+            models_to_try.append(m)
         
     last_error = None
     for current_model in models_to_try:
@@ -53,19 +66,20 @@ def call_gemini(api_key: str, prompt: str, system_instruction: str = None, model
                 res_json = json.loads(resp.read().decode("utf-8"))
                 candidates = res_json.get("candidates", [])
                 if not candidates:
-                    return "Erreur : aucune réponse générée par le modèle."
+                    continue
                 text = candidates[0].get("content", {}).get("parts", [{}])[0].get("text", "")
-                return text.strip()
+                if text:
+                    return text.strip()
         except urllib.error.HTTPError as e:
             error_body = e.read().decode("utf-8", errors="ignore")
-            last_error = f"HTTP {e.code}: {error_body}"
-            # Essayer le modèle fallback si le modèle principal n'est pas trouvé (404)
-            if e.code == 404:
+            last_error = f"HTTP {e.code} ({current_model}): {error_body}"
+            # Réessayer avec le modèle suivant en cas de surcharge (503), quota (429) ou introuvable (404)
+            if e.code in (404, 429, 503):
                 continue
             break
         except Exception as e:
-            last_error = str(e)
-            break
+            last_error = f"{type(e).__name__} ({current_model}): {str(e)}"
+            continue
             
     return f"Échec de l'appel Gemini : {last_error}"
 
