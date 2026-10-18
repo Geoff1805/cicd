@@ -63,3 +63,8 @@ ehthumbs.db
 .vscode/
 *.swp
 *.swo
+
+# Ajouté automatiquement par Sentinel (Sécurité & Secrets)
+.env.local
+*.p12
+*.pyc
