@@ -78,3 +78,11 @@ pwsh -File .\scripts\audit-and-sync.ps1 -SetGeminiSecret "VOTRE_CLE_GEMINI_AI_ST
 
 ## 📚 Documentation Étendue
 Consultez [docs/STUDENT_PACK_GUIDE.md](docs/STUDENT_PACK_GUIDE.md) pour exploiter les crédits Azure, DigitalOcean, Sentry et GitHub Pro.
+
+---
+
+## 📄 Licence
+
+MIT — voir [LICENSE](LICENSE).
+
+Copyright (c) 2026 Geoff1805
