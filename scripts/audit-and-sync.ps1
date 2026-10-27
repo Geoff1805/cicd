@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     Audit et synchronisation transversale de sécurité, CI/CD et IA pour les dépôts GitHub de Geoff1805.
 .DESCRIPTION
@@ -25,8 +25,13 @@ param (
     [string]$SetGeminiSecret = ""
 )
 
+# Configuration Encodage UTF-8 Standard (Antigravity)
+[Console]::InputEncoding  = [System.Text.Encoding]::UTF8
 [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
-$OutputEncoding = [System.Text.Encoding]::UTF8
+$OutputEncoding           = [System.Text.Encoding]::UTF8
+$PSDefaultParameterValues['*:Encoding'] = 'utf8'
+
+
 $ErrorActionPreference = "Continue"
 $Owner = "Geoff1805"
 $DevDir = "g:\Mon Drive\05_Dev"
